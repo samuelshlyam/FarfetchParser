@@ -115,6 +115,7 @@ class FarfetchProductParser:
         all_product_images = []
 
         for html_content in self.html_list:
+            print(html_content)
             soup = BeautifulSoup(html_content, 'html.parser')
             product_details = self.parse_product_details(soup)
             all_product_details.append(product_details)
@@ -126,7 +127,7 @@ def open_link(serverless_urls,url_in):
             "url": url_in
         })
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.3',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.3',
             'Content-Type': 'application/json'
         }
         url=random.choice(serverless_urls)
@@ -137,27 +138,34 @@ def open_link(serverless_urls,url_in):
         time.sleep(3)
         if not ("Access Denied" in response.get('result',"Access Denied") or "429 Too Many Requests" in response.get('result',"429 Too Many Requests")):
             break
+
     return response.get('result')
 
-
+def save_html(html,filename):
+    try:
+        with open(filename, 'w', encoding='utf-8') as file:
+            file.write(html)
+        print(f"HTML content has been successfully written to {filename}")
+    except IOError as e:
+        print(f"An error occurred while writing to the file: {e}")
 # Example usage
-# file_path = r'/Users/samuelshlyam/Downloads/pythonProject (1)/us-sitemap-brands-categories-1.xml'  # Adjust the file path as needed
+# file_path = os.path.join(main_directory,'xml_files')  # Adjust the file path as needed
 # html_contents=[]
 # df = pd.read_xml(file_path)
 # small_df=df.iloc[:100]
 # serverless_urls=["https://router-proxy-google-cloud-o5empm7y3q-rj.a.run.app/fetch", "https://router-proxy-google-cloud-2-o5empm7y3q-pd.a.run.app/fetch","https://router-proxy-google-cloud-o5empm7y3q-pd.a.run.app/fetch"]
-# for index, row in small_df.iterrows():
-#     # Access data by column name
-#     loc_value = row['loc'] if 'loc' in row else None
-#     print(loc_value)
-#     html_content=open_link(serverless_urls,loc_value)
-#     html_contents.append(html_content)
-# clean_html_contents = list(filter(None,html_contents))
-#
+# # for index, row in small_df.iterrows():
+# #     # Access data by column name
+# #     loc_value = row['loc'] if 'loc' in row else None
+# #     print(loc_value)
+# html_content=open_link(serverless_urls,'https://www.farfetch.com/shopping/women/off-white-logo-print-ombre-swimsuit-item-23771460.aspx?storeid=12572')
+# # html_contents.append(html_content)
+# # clean_html_contents = list(filter(None,html_content))
+# html_content=[html_content]
 # # Example usage:
-# parser = FarfetchProductParser(clean_html_contents)
+# parser = FarfetchProductParser(html_content)
 # product_details = parser.parse()
-# file_path_csv=os.path.join(main_directory,'product_output')
+# file_path_csv=os.path.join(main_directory,'product_output.csv')
 # print("Product Details:", product_details)
 # product_details_df=pd.DataFrame(product_details)
 # product_details_df.to_csv(file_path_csv)
@@ -183,10 +191,7 @@ class FarfetchBoutiqueParser:
         for html in self.html_list:
             soup = BeautifulSoup(html, 'html.parser')
             main_component=soup.find('div',class_='ltr-1nm4v7d')
-            print(main_component)
             accordions=main_component.find_all('div',class_='ltr-161ftst e1q06tt43')
-
-            print(accordions)
             for accordion in accordions:
                 boutique={}
 
@@ -218,7 +223,7 @@ class FarfetchBoutiqueParser:
                 html=self.driver.execute_script("return document.documentElement.outerHTML;")
                 soup = BeautifulSoup(html, 'html.parser')
                 self.driver.execute_script("arguments[0].click();", next_button)
-                next_button = WebDriverWait(self.driver, 5).until(
+                next_button = WebDriverWait(self.driver, 10).until(
                             EC.element_to_be_clickable((locator_type, locator))
                         )
                 time.sleep(10)
@@ -231,7 +236,7 @@ class FarfetchBoutiqueParser:
                     filename = os.path.join(main_directory, f'html_{comparison[0]}.html')
                     self.save_html(html, filename)
                     print(comparison)
-                    if comparison[0]==comparison[1]:
+                    if comparison[0]==55:
                         condition=False
                 else:
                     continue
@@ -239,9 +244,8 @@ class FarfetchBoutiqueParser:
                 print('Final button pressed')
                 print(f'Error occured {e}')
                 break
-        filename=os.path.join(main_directory,'html.html')
-        self.save_html(html_list[2],filename)
         self.driver.close()
+        print(f"this is the amount of html in the html list {len(html_list)}")
         return html_list
     def save_html(self,html,filename):
         try:
