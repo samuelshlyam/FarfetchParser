@@ -1,21 +1,27 @@
+import os
+import csv
 import pandas as pd
+import uvicorn
 from bs4 import BeautifulSoup
 import json
 import random
 import time
 from datetime import datetime
 import requests
-import csv
-from urllib.parse import unquote
-import os
 import xml.etree.ElementTree as ET
 import gzip
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
+
+from dotenv import load_dotenv
+from fastapi import BackgroundTasks
+from fastapi import FastAPI
+from sqlalchemy import create_engine, text
+
+app=FastAPI()
+load_dotenv()
 current_date=datetime.now().strftime("%m_%d_%Y")
 current_directory= os.getcwd()
 main_directory=os.path.join(current_directory,'outputs')
-
-
 
 class FarfetchProductParser:
     def __init__(self, base_url):
@@ -203,93 +209,18 @@ class FarfetchProductParser:
 
 
 
-
-
-def extract_and_categorize_urls(input_csv, output_dir, brands,countries):
-    # Ensure the output directory exists
-    os.makedirs(output_dir, exist_ok=True)
-
-    # Initialize dictionaries to store file handles and CSV writers
-    file_handles = {}
-    csv_writers = {}
-
-    # Create CSV files for each brand and category
-    for brand in brands:
-        for category in ['category', 'single_product']:
-            for country in countries:
-                temp_country = country.replace('/shopping', '')
-                temp_country = 'us' if temp_country == '.com' else temp_country
-                filename = f"{brand}_{category}_{temp_country}.csv"
-                file_path = os.path.join(output_dir, filename)
-                file_handles[f"{brand}_{category}_{temp_country}"] = open(file_path, 'w', newline='', encoding='utf-8')
-                csv_writers[f"{brand}_{category}_{temp_country}"] = csv.writer(file_handles[f"{brand}_{category}_{temp_country}"])
-                csv_writers[f"{brand}_{category}_{temp_country}"].writerow(['URL'])  # Write header
-
-    with open(input_csv, 'r', newline='', encoding='utf-8') as infile:
-        reader = csv.reader(infile)
-        next(reader, None)  # Skip header
-
-        for row in reader:
-            if row:  # Check if the row is not empty
-                url = unquote(row[0]).lower()  # Get the URL from the first column, decode it, and convert to lowercase
-
-                for brand in brands:
-                    for country in countries:
-                        if brand in url and country in url:
-                            category = 'category' if url.endswith('items.aspx') else 'single_product'
-                            temp_country=country.replace('/shopping','')
-                            temp_country='us' if temp_country=='.com' else temp_country
-                            csv_writers[f"{brand}_{category}_{temp_country}"].writerow([url])
-                            break  # Stop checking other brands once a match is found
-
-    # Close all file handles
-    for file_handle in file_handles.values():
-        file_handle.close()
-
-    print(f"Extraction and categorization complete. Results saved in {output_dir}")
-
-
-def get_urls_from_csv(csv_filename):
-    urls = []
-
-    try:
-        with open(csv_filename, 'r', newline='', encoding='utf-8') as csvfile:
-            reader = csv.reader(csvfile)
-            next(reader, None)  # Skip the header row
-
-            for row in reader:
-                if row:  # Check if the row is not empty
-                    url = unquote(row[0]).strip()  # Get the URL from the first column, decode it, and remove whitespace
-                    if url:  # Check if the URL is not empty after stripping
-                        urls.append(url)
-
-    except FileNotFoundError:
-        print(f"Error: The file '{csv_filename}' was not found.")
-    except csv.Error as e:
-        print(f"Error reading CSV file: {e}")
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-
-    return urls
-#Get csv full of input URL's (should use category for now)
-# brands = ['off-white', 'palm-angels']  # This list can be of any length
-# countries = ['uk/shopping','it/shopping','.com/shopping']
-# extract_and_categorize_urls('farfetch_urls.csv', 'URL_Input_CSVs', brands,countries)
-
-
-# Example usage:
-brand_name='off-white'
-country_name='it'
-input_csv_filename = os.path.join(current_directory, 'URL_Input_CSVs', f'{brand_name}_category_{country_name}.csv')
-initial_base_urls=get_urls_from_csv(input_csv_filename)
-base_urls=[initial_base_url+'?page={page}' for initial_base_url in initial_base_urls]
-all_product_details=[]
-for base_url in base_urls:
+def parse_farfetch_brand(base_url):
     parser = FarfetchProductParser(base_url)
     product_details = parser.parse()
-    all_product_details.extend(product_details)
-file_path_csv=os.path.join(main_directory,'product_output','product_output.csv')
-print("Product Details:", all_product_details)
-product_details_df=pd.DataFrame(all_product_details)
-product_details_df.to_csv(file_path_csv)
+    file_path_csv=os.path.join(main_directory,'product_output','product_output.csv')
+    print("Product Details:", product_details)
+    product_details_df=pd.DataFrame(product_details)
+    product_details_df.to_csv(file_path_csv)
+@app.post("/run_parser")
+async def brand_batch_endpoint(base_url:str, background_tasks: BackgroundTasks):
+    background_tasks.add_task(parse_farfetch_brand,base_url)
 
+
+    return {"message": "Notification sent in the background"}
+if __name__ == "__main__":
+    uvicorn.run("main_parser:app", port=8004, log_level="info")
